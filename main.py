@@ -1,146 +1,134 @@
 import streamlit as st
 import speech_recognition as sr
 from gtts import gTTS
-import wavio
 import tempfile
 import os
 
-# ==============  BASIC CONFIG  =================
-st.set_page_config(page_title="🗣 Text ↔ Voice Converter", page_icon="🎤", layout="centered")
+# =============================
+# 🎛 APP CONFIGURATION
+# =============================
+st.set_page_config(page_title="Text ↔ Voice ↔ Text Converter", page_icon="🎤", layout="centered")
+st.title("🎙 Text ↔ Voice ↔ Text Converter (Cloud Ready)")
+st.caption("Convert between text, voice, and language | Fully Cloud Compatible 🚀")
 
-st.title("🎙 Smart Converter: Text ↔ Voice ↔ Text")
-st.caption("Convert easily between Text, Voice, and more | English + Hindi support")
+# =============================
+# 🎧 FUNCTIONS
+# =============================
 
-# ==============  FUNCTION DEFINITIONS  =================
-
-# 🎤 Record audio
-def record_audio(duration=5, fs=16000):
-    st.info(f"🎙 Recording for {duration} seconds...")
-    try:
-        recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
-        sd.wait()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp:
-            wavio.write(temp.name, recording, fs, sampwidth=2)
-            return temp.name
-    except Exception as e:
-        st.error(f"⚠ Error during recording: {e}")
-        return None
-
-# 🎧 Convert speech → text
-def speech_to_text(filename, lang="en-IN"):
+# Speech → Text
+def speech_to_text(uploaded_file, lang="en-IN"):
     recognizer = sr.Recognizer()
-    with sr.AudioFile(filename) as source:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp:
+        temp.write(uploaded_file.read())
+        temp_path = temp.name
+
+    with sr.AudioFile(temp_path) as source:
         recognizer.adjust_for_ambient_noise(source, duration=0.8)
-        audio = recognizer.record(source)
+        audio_data = recognizer.record(source)
     try:
-        text = recognizer.recognize_google(audio, language=lang)
+        text = recognizer.recognize_google(audio_data, language=lang)
         return text
     except sr.UnknownValueError:
-        return "⚠ Could not understand the audio. Try again!"
+        return "⚠ Could not understand the audio."
     except sr.RequestError:
-        return "🌐 Internet connection error. Please retry."
+        return "🌐 Network error, please check your internet connection."
 
-# 🔊 Convert text → speech
+# Text → Speech
 def text_to_speech(text, lang="en"):
-    try:
-        if not text.strip():
-            st.warning("⚠ Please enter some text first.")
-            return None
-        tts = gTTS(text=text, lang=lang, slow=False)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp:
-            tts.save(temp.name)
-            return temp.name
-    except Exception as e:
-        st.error(f"⚠ Text-to-speech failed: {e}")
+    if not text.strip():
+        st.warning("Please enter some text first!")
         return None
+    tts = gTTS(text=text, lang=lang, slow=False)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp:
+        tts.save(temp.name)
+        return temp.name
 
-# ✏️ Convert text → text (simple transformations)
-def text_to_text(text, mode):
-    if mode == "UPPERCASE":
-        return text.upper()
-    elif mode == "lowercase":
-        return text.lower()
-    elif mode == "Reverse text":
-        return text[::-1]
-    elif mode == "Capitalize Each Word":
-        return text.title()
-    else:
-        return text
+# Text → Text (Translation)
+def text_to_text(text, target_lang):
+    if not text.strip():
+        return "⚠ Please enter some text first!"
+    translator = Translator()
+    try:
+        result = translator.translate(text, dest=target_lang)
+        return result.text
+    except Exception as e:
+        return f"❌ Translation failed: {str(e)}"
 
-# ==============  APP UI  =================
+# =============================
+# 🎛 UI DESIGN
+# =============================
+
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🎤 Voice → Text", 
+    "🎧 Voice → Text", 
     "💬 Text → Voice", 
     "🔁 Voice → Voice", 
-    "📝 Text → Text"
+    "📝 Text ↔ Text"
 ])
 
-# ==============  TAB 1: VOICE TO TEXT  =================
+# 🎤 Voice → Text
 with tab1:
-    st.subheader("🎧 Voice → Text Converter")
+    st.header("🎧 Voice → Text Converter")
+    lang = st.radio("Select Language:", ["English", "Hindi"])
+    lang_code = "en-IN" if lang == "English" else "hi-IN"
+    uploaded = st.file_uploader("🎵 Upload your voice file (WAV/MP3):", type=["wav", "mp3"])
 
-    lang_choice = st.radio("Select Language:", ["English", "Hindi"])
-    lang_code = "en-IN" if lang_choice == "English" else "hi-IN"
+    if uploaded and st.button("Convert to Text"):
+        text = speech_to_text(uploaded, lang=lang_code)
+        st.success("Recognized Text:")
+        st.write(text)
 
-    duration = st.slider("Recording Duration (seconds)", 3, 10, 5)
-
-    if st.button("🎙 Start Recording", key="rec1"):
-        file = record_audio(duration)
-        if file:
-            text = speech_to_text(file, lang=lang_code)
-            st.success("🗣 Recognized Text:")
-            st.write(text)
-
-# ==============  TAB 2: TEXT TO VOICE  =================
+# 💬 Text → Voice
 with tab2:
-    st.subheader("💬 Text → Voice Converter")
+    st.header("💬 Text → Voice Converter")
+    text_input = st.text_area("Enter your text here:")
+    lang2 = st.radio("Select Voice Language:", ["English", "Hindi"], key="t2vlang")
+    lang_code2 = "en" if lang2 == "English" else "hi"
 
-    text_input = st.text_area("📝 Enter text here:")
-    lang_choice2 = st.radio("Select Voice Language:", ["English", "Hindi"], key="lang2")
-    lang_code2 = "en" if lang_choice2 == "English" else "hi"
-
-    if st.button("🔊 Convert to Voice"):
+    if st.button("Convert to Voice"):
         audio_file = text_to_speech(text_input, lang=lang_code2)
         if audio_file:
             st.audio(audio_file, format="audio/mp3")
             st.download_button("⬇ Download Audio", open(audio_file, "rb").read(),
                             file_name="converted_voice.mp3", mime="audio/mp3")
 
-# ==============  TAB 3: VOICE TO VOICE  =================
+# 🔁 Voice → Voice
 with tab3:
-    st.subheader("🔁 Voice → Voice Converter")
+    st.header("🔁 Voice → Voice Converter")
+    lang3 = st.radio("Select Output Voice Language:", ["English", "Hindi"], key="v2vlang")
+    lang_code3 = "en" if lang3 == "English" else "hi"
+    uploaded2 = st.file_uploader("🎙 Upload your voice file (WAV/MP3):", type=["wav", "mp3"], key="v2vupload")
 
-    lang_choice3 = st.radio("Select Output Voice Language:", ["English", "Hindi"], key="lang3")
-    lang_code3 = "en" if lang_choice3 == "English" else "hi"
-    duration2 = st.slider("Recording Duration (seconds)", 3, 10, 5, key="duration2")
+    if uploaded2 and st.button("Convert Voice"):
+        text = speech_to_text(uploaded2)
+        st.write("Recognized Text:", text)
+        if not text.startswith("⚠"):
+            audio_out = text_to_speech(text, lang=lang_code3)
+            if audio_out:
+                st.audio(audio_out, format="audio/mp3")
+                st.download_button("⬇ Download Converted Voice", open(audio_out, "rb").read(),
+                                file_name="voice_output.mp3", mime="audio/mp3")
 
-    if st.button("🎙 Record & Convert", key="rec2"):
-        file = record_audio(duration2)
-        if file:
-            text = speech_to_text(file, lang="en-IN")
-            st.write("🗣 You said:", text)
-            if not text.startswith("⚠"):
-                audio_out = text_to_speech(text, lang=lang_code3)
-                if audio_out:
-                    st.audio(audio_out, format="audio/mp3")
-                    st.download_button("⬇ Download Voice", open(audio_out, "rb").read(),
-                                    file_name="voice_output.mp3", mime="audio/mp3")
-
-# ==============  TAB 4: TEXT TO TEXT  =================
+# 📝 Text ↔ Text
 with tab4:
-    st.subheader("📝 Text → Text Converter")
+    st.header("📝 Text ↔ Text Converter")
+    text_input2 = st.text_area("Enter your text to translate:")
+    lang4 = st.radio("Select Output Language:", ["English", "Hindi"], key="t2tlang")
 
-    input_text = st.text_area("✍ Enter your text:")
-    mode = st.selectbox("Select conversion mode:", 
-                        ["UPPERCASE", "lowercase", "Reverse text", "Capitalize Each Word"])
+    if st.button("Convert Text"):
+        lang_code4 = "en" if lang4 == "English" else "hi"
+        translated_text = text_to_text(text_input2, lang_code4)
+        st.success("✅ Translated Text:")
+        st.write(translated_text)
 
-    if st.button("🔁 Convert Text", key="convert_text"):
-        if input_text.strip():
-            result = text_to_text(input_text, mode)
-            st.success("✅ Converted Text:")
-            st.code(result)
-        else:
-            st.warning("⚠ Please enter some text to convert.")
+        st.download_button(
+            label="⬇ Download Translated Text",
+            data=translated_text,
+            file_name="translated_text.txt",
+            mime="text/plain"
+        )
+
+
+
 
 
 
