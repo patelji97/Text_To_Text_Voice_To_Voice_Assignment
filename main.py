@@ -1,7 +1,6 @@
 import streamlit as st
 import speech_recognition as sr
 from gtts import gTTS
-import sounddevice as sd
 import wavio
 import tempfile
 import os
@@ -142,4 +141,5 @@ with tab4:
             st.code(result)
         else:
             st.warning("⚠ Please enter some text to convert.")
+
 
