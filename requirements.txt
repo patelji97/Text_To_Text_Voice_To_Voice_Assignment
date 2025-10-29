@@ -1,7 +1,4 @@
 streamlit
 SpeechRecognition
 gTTS
-sounddevice
-wavio
 pydub
-numpy
